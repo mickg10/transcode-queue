@@ -210,6 +210,8 @@ class Worker:
             raise RuntimeError("Source changed while encoding; temporary output was not published")
         self.store.update(identifier, message="Validating output", progress=.995)
         validate_output(meta, probe(partial, self.ffprobe), preset)
+        if self.stop_event.is_set() or self.store.get(identifier)["cancel_requested"]:
+            raise RuntimeError("Interrupted before publication")
         if output.exists():
             previous = output.with_name(output.name + f".previous-{identifier}")
             if previous.exists():
@@ -225,12 +227,14 @@ class Worker:
         logfile = log_dir / f"{identifier}-{mode}.log"
         last_frame = 0
         with logfile.open("w") as err:
-            self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=err, text=True, bufsize=1)
+            self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=err, bufsize=0)
             selector = selectors.DefaultSelector()
             selector.register(self.process.stdout, selectors.EVENT_READ)
             fields = {}
+            pending = b""
+            eof = False
             try:
-                while self.process.poll() is None:
+                while not eof:
                     if self.stop_event.is_set() or self.store.get(identifier)["cancel_requested"]:
                         self.process.terminate()
                         try:
@@ -239,17 +243,24 @@ class Worker:
                             self.process.kill()
                         break
                     for key, _ in selector.select(timeout=.5):
-                        line = key.fileobj.readline().strip()
-                        if "=" not in line:
-                            continue
-                        name, value = line.split("=", 1)
-                        fields[name] = value
-                        if name == "frame":
-                            last_frame = int(value)
-                        if name == "progress":
-                            self.store.update(identifier,
-                                              progress=min(.99, max(0, float(fields.get("out_time_us", 0)) / 1e6 / seconds)),
-                                              fps=float(fields.get("fps", 0)), speed=fields.get("speed", ""))
+                        chunk = os.read(key.fileobj.fileno(), 65536)
+                        if not chunk:
+                            eof = True
+                            break
+                        pending += chunk
+                        while b"\n" in pending:
+                            raw, pending = pending.split(b"\n", 1)
+                            line = raw.decode(errors="replace").strip()
+                            if "=" not in line:
+                                continue
+                            name, value = line.split("=", 1)
+                            fields[name] = value
+                            if name == "frame":
+                                last_frame = int(value)
+                            if name == "progress":
+                                self.store.update(identifier,
+                                                  progress=min(.99, max(0, float(fields.get("out_time_us", 0)) / 1e6 / seconds)),
+                                                  fps=float(fields.get("fps", 0)), speed=fields.get("speed", ""))
                 code = self.process.wait()
             finally:
                 selector.close()

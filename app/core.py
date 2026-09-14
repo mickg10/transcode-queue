@@ -12,7 +12,8 @@ from fractions import Fraction
 from pathlib import Path, PurePosixPath
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".mkv", ".mxf", ".mts", ".m2ts", ".avi", ".webm", ".ts"}
-EXCLUDED_DIRS = {"proxy", "proxies", "render", "renders", "@recycle", "@eadir"}
+EXCLUDED_DIRS = {"proxy", "proxies", "reference", "render", "renders", "@recycle", "@eadir",
+                 "$recycle.bin", "system volume information"}
 C50_PRESET = {
     "id": "c50-proxy", "name": "C50 proxy", "container": "mp4",
     "codec": "hevc", "backend": "auto", "max_width": 3456, "max_height": 2304,
@@ -72,7 +73,7 @@ class MediaPaths:
                                      "bytes": None, "modified": actual.stat().st_mtime}
         return sorted(entries.values(), key=lambda x: (not x["directory"], x["name"].casefold()))
 
-    def scan(self, relative: str, recursive: bool = True) -> list[dict]:
+    def scan(self, relative: str, recursive: bool = True, errors: list | None = None) -> list[dict]:
         result, visited = [], set()
         def walk(folder):
             actual = self.resolve(folder, must_exist=True)
@@ -82,7 +83,11 @@ class MediaPaths:
             for item in self.children(folder):
                 if item["directory"]:
                     if recursive and item["name"].lower() not in EXCLUDED_DIRS:
-                        walk(item["path"])
+                        try:
+                            walk(item["path"])
+                        except (OSError, ValueError) as exc:
+                            if errors is not None:
+                                errors.append({"path": item["path"], "error": str(exc)})
                 elif is_video(Path(item["name"])):
                     item["recorded"] = recording_time(item["name"], item["modified"])
                     result.append(item)
@@ -97,7 +102,7 @@ def is_video(path: Path) -> bool:
 
 
 def recording_time(name: str, modified: float) -> float:
-    match = re.search(r"H(\d{6})_(\d{6})", name)
+    match = re.search(r"C\d+[A-Z](\d{6})_(\d{6})", name, re.I)
     if match:
         import datetime
         try:

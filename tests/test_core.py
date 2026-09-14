@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from app.core import C50_PRESET, MediaPaths, Store, dimensions, same_duration
-from app.worker import command, validate_output
+from app.core import C50_PRESET, MediaPaths, Store, dimensions, same_duration, recording_time
+from app.worker import Worker, command, validate_output
 from analysis.core import DecodeConfig, hardware_command
 
 
@@ -42,7 +42,7 @@ def test_explicit_alias_stays_in_its_own_subtree(tmp_path):
 def test_scan_omits_outputs_and_orders_by_capture_date(tmp_path):
     for name in ("A_C001H260901_120000Z.MP4", "A_C002H260830_120000Z.MP4", "a_Proxy.mov"):
         (tmp_path / name).touch()
-    for directory in ("proxy", "Proxies", ".rsync-partial", "render"):
+    for directory in ("proxy", "Proxies", "REFERENCE", ".rsync-partial", "render"):
         (tmp_path / directory).mkdir()
         (tmp_path / directory / "ignored.mp4").touch()
     result = MediaPaths(tmp_path).scan("")
@@ -106,3 +106,37 @@ def test_analysis_uses_hardware_ffmpeg_and_quotes_remote_source():
     assert remote[remote.index("-hwaccel")+1] == "cuda"
     assert "hevc_cuvid" in remote
     assert "pipe:1" in remote
+
+
+def test_mxf_and_hevc_use_canon_recording_date():
+    assert recording_time("A_0001C009A251222_031228L9_CANON.MXF", 0) == recording_time(
+        "A_0003C009H251222_031228L9_CANON.MP4", 1)
+
+
+def test_scan_reports_unreadable_subfolder(tmp_path, monkeypatch):
+    (tmp_path / "blocked").mkdir()
+    (tmp_path / "good.mp4").touch()
+    paths = MediaPaths(tmp_path)
+    original = paths.children
+    def children(path=""):
+        if path == "blocked":
+            raise PermissionError("Test permission denied")
+        return original(path)
+    monkeypatch.setattr(paths, "children", children)
+    warnings = []
+    assert len(paths.scan("", errors=warnings)) == 1
+    assert warnings[0]["path"] == "blocked"
+
+
+def test_worker_drains_progress_even_when_process_exits_quickly(tmp_path):
+    import sys
+    (tmp_path / "clip.mp4").touch()
+    store = Store(tmp_path / "data")
+    paths = MediaPaths(tmp_path)
+    identifier = store.enqueue(paths, ["clip.mp4"], "c50-proxy")[0]["id"]
+    worker = Worker(store, paths)
+    cmd = [sys.executable, "-c",
+           "print('frame=240\\nfps=41.5\\nout_time_us=10000000\\nspeed=1.7x\\nprogress=end')"]
+    code, _, last_frame = worker.encode(identifier, cmd, 10, "test")
+    assert code == 0 and last_frame == 240
+    assert store.get(identifier)["fps"] == 41.5

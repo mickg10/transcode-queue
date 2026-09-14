@@ -18,7 +18,7 @@ $("selectAll").onchange=()=>{selected=$("selectAll").checked?new Set(entries.fil
 $("refreshBrowse").onclick=attempt(()=>browse(currentPath));
 $("toggleQueue").onclick=attempt(async()=>{await api("/api/control","POST",{paused:!paused});await refresh();});
 $("queueSelected").onclick=attempt(async()=>{const result=await api("/api/jobs","POST",{sources:[...selected],preset_id:$("presetSelect").value,output:$("customOutput").value.trim()||null});notify(result.jobs.filter(j=>!j.duplicate).length+" jobs added; "+result.jobs.filter(j=>j.duplicate).length+" already queued.");await refresh();});
-$("queueFolder").onclick=attempt(async()=>{$("queueFolder").disabled=true;try{const r=await api("/api/queue-tree","POST",{path:currentPath,recursive:true,preset_id:$("presetSelect").value});notify(r.jobs.filter(j=>!j.duplicate).length+" jobs added, newest first.");await refresh();}finally{$("queueFolder").disabled=false;}});
+$("queueFolder").onclick=attempt(async()=>{$("queueFolder").disabled=true;try{const r=await api("/api/queue-tree","POST",{path:currentPath,recursive:true,preset_id:$("presetSelect").value});notify(r.jobs.filter(j=>!j.duplicate).length+" jobs added, newest first."+(r.warnings?.length?" Skipped folders: "+r.warnings.map(w=>w.path+": "+w.error).join("; "):""),Boolean(r.warnings?.length));await refresh();}finally{$("queueFolder").disabled=false;}});
 $("jobFilter").onchange=attempt(refresh);
 $("managePresets").onclick=()=>{fillPreset(presets.find(p=>p.id===$("presetSelect").value)||presets[0]);$("presetDialog").showModal();};
 $("closePresets").onclick=()=>$("presetDialog").close();

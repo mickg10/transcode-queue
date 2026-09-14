@@ -100,6 +100,10 @@ def create_app(data_dir: Path | None = None, media_root: Path | None = None, run
     async def missing_file(request, exc):
         return JSONResponse({"detail": "File or directory not found"}, status_code=404)
 
+    @app.exception_handler(PermissionError)
+    async def unreadable_file(request, exc):
+        return JSONResponse({"detail": "This directory is not readable by the service"}, status_code=403)
+
     @app.get("/health")
     def health():
         return {"ok": True}
@@ -110,8 +114,10 @@ def create_app(data_dir: Path | None = None, media_root: Path | None = None, run
 
     @app.post("/api/scan")
     def scan(body: TreeQueue):
-        entries = paths.scan(body.path, body.recursive)
-        return {"files": entries, "count": len(entries), "bytes": sum(x["bytes"] for x in entries)}
+        errors = []
+        entries = paths.scan(body.path, body.recursive, errors)
+        return {"files": entries, "count": len(entries), "bytes": sum(x["bytes"] for x in entries),
+                "warnings": errors}
 
     @app.get("/api/presets")
     def presets():
@@ -140,8 +146,10 @@ def create_app(data_dir: Path | None = None, media_root: Path | None = None, run
 
     @app.post("/api/queue-tree")
     def queue_tree(body: TreeQueue):
-        sources = [x["path"] for x in paths.scan(body.path, body.recursive)]
-        return {"jobs": store.enqueue(paths, sources, body.preset_id), "count": len(sources)}
+        errors = []
+        sources = [x["path"] for x in paths.scan(body.path, body.recursive, errors)]
+        return {"jobs": store.enqueue(paths, sources, body.preset_id), "count": len(sources),
+                "warnings": errors}
 
     @app.get("/api/jobs")
     def jobs(limit: int = 500):
