@@ -1,0 +1,14 @@
+.git
+.venv
+data
+test-media
+models
+analysis-output
+__pycache__
+.pytest_cache
+*.log
+*.mp4
+*.mov
+*.jpg
+*.png
+.env

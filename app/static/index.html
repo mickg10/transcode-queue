@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transcode Queue</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header><div><span class="eyebrow">MEDIA WORKSPACE</span><h1>Transcode Queue</h1></div>
+    <div class="header-status"><span id="queueState" class="pill">Connecting</span><button id="toggleQueue">Start queue</button></div>
+  </header>
+  <div id="notice" role="status" hidden></div>
+  <main>
+    <section class="stats" aria-label="Queue overview">
+      <article><span>Waiting</span><strong id="queuedCount">0</strong></article>
+      <article><span>Processing</span><strong id="runningCount">0</strong></article>
+      <article><span>Complete / reused</span><strong id="doneCount">0</strong></article>
+      <article><span>Free storage</span><strong id="freeSpace">—</strong></article>
+    </section>
+    <div class="workspace">
+      <section class="panel browser">
+        <div class="panel-heading"><div><h2>Media</h2><p>Browse a directory, choose files, and add a preset.</p></div><button id="refreshBrowse" class="quiet">Refresh</button></div>
+        <nav id="breadcrumbs" aria-label="Current directory"></nav>
+        <div class="browser-tools">
+          <label class="select-label">Preset<select id="presetSelect"></select></label>
+          <button id="managePresets" class="quiet">Manage presets</button>
+          <label class="upload-button">Upload<input id="uploadFiles" type="file" multiple accept="video/*,.mxf,.m2ts,.mts" hidden></label>
+        </div>
+        <div id="uploadStatus" hidden><progress id="uploadProgress" max="100" value="0"></progress><span id="uploadLabel"></span></div>
+        <div class="file-list">
+          <table><thead><tr><th><input type="checkbox" id="selectAll" aria-label="Select all videos"></th><th>Name</th><th>Size</th></tr></thead><tbody id="files"></tbody></table>
+          <p id="emptyFolder" class="empty" hidden>No video files or directories here.</p>
+        </div>
+        <div class="destination"><label>Destination for one selected file <span>(optional)</span><input id="customOutput" placeholder="foo/proxy/bar.mp4"></label></div>
+        <div class="actions"><button id="queueSelected">Queue selected <span id="selectionCount">0</span></button><button id="queueFolder" class="quiet">Queue folder + subfolders</button></div>
+        <p class="hint">Newest recordings run first. Completed files with matching duration are reused.</p>
+      </section>
+      <section class="panel jobs-panel">
+        <div class="panel-heading"><div><h2>Queue</h2><p id="queueHint">One job at a time · newest first</p></div><select id="jobFilter" aria-label="Filter jobs"><option value="all">All jobs</option><option value="active">Active</option><option value="failed">Failed</option><option value="complete">Finished</option></select></div>
+        <div id="jobs" class="jobs"></div><p id="emptyQueue" class="empty">Your queue is empty. Select a video to begin.</p>
+      </section>
+    </div>
+    <footer><span id="hardware">Checking hardware…</span><span>Sources stay in place · unfinished outputs remain temporary</span></footer>
+  </main>
+  <dialog id="presetDialog">
+    <form id="presetForm">
+      <div class="panel-heading"><h2>Presets</h2><button type="button" id="closePresets" class="quiet">Close</button></div>
+      <div class="preset-picker"><select id="presetEditorSelect"></select><button type="button" id="newPreset" class="quiet">New preset</button></div>
+      <div class="form-grid">
+        <label>Name<input name="name" required maxlength="100"></label><label>ID<input name="id" required pattern="[a-z0-9][a-z0-9-]{0,63}"></label>
+        <label>Container<select name="container"><option value="mp4">MP4</option><option value="mov">QuickTime MOV</option></select></label>
+        <label>Video codec<select name="codec"><option value="hevc">HEVC</option><option value="h264">H.264</option></select></label>
+        <label>Processing<select name="backend"><option value="auto">Automatic GPU, then fallback</option><option value="nvidia">NVIDIA decode + encode</option><option value="nvidia-encode">CPU decode + NVIDIA encode</option><option value="software">CPU</option></select></label>
+        <label>Bit depth<select name="bit_depth"><option value="10">10 bit</option><option value="8">8 bit</option></select></label>
+        <label>Maximum width<input name="max_width" type="number" min="128" max="8192" required></label><label>Maximum height<input name="max_height" type="number" min="128" max="8192" required></label>
+        <label>Target bitrate (Mbps)<input name="bitrate_mbps" type="number" min="1" max="500" required></label><label>Maximum bitrate (Mbps)<input name="maxrate_mbps" type="number" min="1" max="800" required></label>
+        <label>Quality (lower is better)<input name="quality" type="number" min="0" max="51" required></label><label>Keyframe interval<input name="gop" type="number" min="1" max="300" required></label>
+        <label>NVIDIA preset<select name="nvenc_preset"><option>p1</option><option>p2</option><option>p3</option><option>p4</option><option>p5</option><option>p6</option><option>p7</option></select></label>
+        <label>Audio<select name="audio"><option value="copy">Copy every audio track</option><option value="aac">AAC, preserve track count</option></select></label>
+        <label>Output subdirectory<input name="output_directory" pattern="[A-Za-z0-9_-]{1,64}" required></label>
+        <label class="checkbox-label"><input name="reuse_legacy_proxies" type="checkbox">Reuse existing _Proxy files</label>
+      </div>
+      <p class="hint">Aspect ratio, frame rate, and timecode are preserved. Preset edits apply to new jobs.</p>
+      <div class="actions"><button type="submit">Save preset</button><button type="button" id="deletePreset" class="danger quiet">Delete preset</button></div>
+    </form>
+  </dialog>
+  <dialog id="logDialog"><div class="panel-heading"><h2>Job details</h2><button id="closeLog" class="quiet">Close</button></div><pre id="logText"></pre></dialog>
+  <script src="/static/app.js"></script>
+</body>
+</html>

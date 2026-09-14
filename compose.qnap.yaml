@@ -1,0 +1,10 @@
+services:
+  transcode-queue:
+    runtime: nvidia-runtime
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      MEDIA_ALIASES: '{"staging_m3":"/imports/staging_m3"}'
+      WAIT_FOR_MANIFEST: "${WAIT_FOR_MANIFEST:-}"
+    volumes:
+      - "${MEDIA_STAGING:-/share/media/backup/macbook_m3/u/media/photos/staging}:/imports/staging_m3"

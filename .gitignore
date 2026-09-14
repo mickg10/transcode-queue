@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+data/
+models/
+analysis-output/
+*.log
+*.sqlite3*
+*.mp4
+*.mov
+*.jpg
+*.png
+test-media/
+test-result.json
+run-tests-local.py
