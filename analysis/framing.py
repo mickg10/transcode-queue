@@ -202,9 +202,13 @@ def add_adaptive_perspective(result, target, times, bounds, lookahead):
         alphas.append(lo)
     alphas=np.array(alphas)
     # Slow changes in perspective; only lower the safe strength ceiling.
-    for i in range(1,len(alphas)):alphas[i]=min(alphas[i],alphas[i-1]+.025*(keys[i,0]-keys[i-1,0]))
-    for i in range(len(alphas)-2,-1,-1):alphas[i]=min(alphas[i],alphas[i+1]+.025*(keys[i+1,0]-keys[i,0]))
     for attempt in range(30):
+        # Reapply after any local coverage correction too, so a reduction cannot
+        # introduce a sudden change in perspective at the adjacent keyframes.
+        for i in range(1,len(alphas)):
+            alphas[i]=min(alphas[i],alphas[i-1]+.025*(keys[i,0]-keys[i-1,0]))
+        for i in range(len(alphas)-2,-1,-1):
+            alphas[i]=min(alphas[i],alphas[i+1]+.025*(keys[i+1,0]-keys[i,0]))
         vertices=np.array([mapped_points(unit,transform(k,a)) for k,a in zip(keys,alphas)])
         interp=np.stack([np.interp(times,keys[:,0],vertices[:,p,c]) for p in range(4) for c in range(2)],axis=1).reshape(-1,4,2)
         bad=[]

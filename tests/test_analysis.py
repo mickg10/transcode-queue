@@ -136,6 +136,8 @@ def test_perspective_keeps_pixels_and_required_performers():
         assert covers_frame(quad)
         bounds=transform_box(row['required'],homography(quad))
         assert bounds[:2].min()>=-2e-6 and bounds[2:].max()<=1+2e-6
+    strength=np.array([k['strength'] for k in keys])
+    assert np.max(abs(np.diff(strength))/np.diff(times))<=.025+1e-8
     assert not covers_frame(np.zeros((4,2)))
 
 
