@@ -2,8 +2,7 @@ FROM ubuntu:24.04 AS ffmpeg-build
 ARG DEBIAN_FRONTEND=noninteractive
 ARG FFMPEG_REV=d3ad8a7fee6a647c6362e4a105d949282d50a98f
 ARG NV_CODEC_HEADERS=n13.0.19.0
-RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
- && apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential clang nasm pkg-config git ca-certificates libx264-dev libx265-dev \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
@@ -23,8 +22,7 @@ RUN ./configure --prefix=/opt/ffmpeg --disable-doc --disable-debug --disable-aut
 
 FROM ubuntu:24.04 AS runtime
 ARG DEBIAN_FRONTEND=noninteractive
-RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
- && apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-venv ca-certificates libx264-164 libx265-199 libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg-build /opt/ffmpeg /opt/ffmpeg
