@@ -94,7 +94,7 @@ nas_proxy_job.py batch has finished. It reads that batch's manifest only.
 ~~~sh
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
-DATA_DIR=/tmp/transcode-queue-test MEDIA_ROOT=/tmp .venv/bin/pytest -q
+DATA_DIR=/tmp/transcode-queue-test MEDIA_ROOT=/tmp .venv/bin/python -m pytest -q
 ~~~
 
 Tests exercise path containment, duration comparisons, queue ordering and duplicate
@@ -108,6 +108,59 @@ FFmpeg**. It does not use OpenCV VideoCapture or silently fall back to CPU decod
 It can start FFmpeg locally or through SSH on a GPU host. Only reduced-resolution
 frames cross the pipe. Tracking outputs are offline artifacts for editorial review;
 they do not modify a Premiere project by themselves.
+
+The optional analysis dependencies are separate from the web worker:
+
+~~~sh
+pip install -r requirements-analysis.txt
+python -m analysis.analyze decode.json --models models --output analysis-output --gpu
+python -m analysis.framing analysis-output framing.json --output full-body.json
+python -m analysis.framing analysis-output framing.json --output dramatic.json --dramatic
+~~~
+
+The analysis output directory must be new. A failed decoder, inference call, or
+review-image write records a failed manifest and returns an error. Existing
+analysis results are never replaced by a retry. Framing requires a completed
+manifest with the matching number of detection records.
+
+Example decode.json, with paths interpreted on the FFmpeg host:
+
+~~~json
+{"source":"/media/photos/example.mp4","width":1152,"height":768,"fps":2,"start":0,"duration":600,"codec":"hevc"}
+~~~
+
+FFmpeg must support the source format in its NVIDIA hardware decoder. The GPU
+inference option also requires a compatible CUDA PyTorch and ONNX Runtime GPU
+installation. A tested analysis environment used PyTorch 2.9.1+cu129,
+onnxruntime-gpu 1.26.0, and OpenCV 4.11. Person inference uses CUDA; the lightweight
+YuNet face detector uses CPU. These optional inference packages and model weights
+are not included in the queue's web image. Omitting --gpu selects CPU inference,
+while video decoding remains hardware-only.
+
+Obtain object_detection_yolox_2022nov.onnx and face_detection_yunet_2023mar.onnx
+from [OpenCV Zoo](https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models).
+Place them in the models directory and retain the upstream model licenses.
+No face identities or recognition embeddings are generated.
+
+Example framing.json (calibrate these normalized coordinates against the scene):
+
+~~~json
+{"floor":0.865,"maximum_head_y":0.60,"stage_anchor":[0.38,0.32,0.77,0.865],"dramatic_ranges":[[120,180]],"wide_ranges":[[0,20]]}
+~~~
+
+The planner combines body and face bounds, anticipates entrances, bridges short
+detection gaps, and widens for longer uncertainty. Dramatic ranges are explicit
+editorial choices; the detector does not infer dramatic meaning. Optional
+corner_pin coordinates are ordered upper-left, upper-right, lower-left,
+lower-right. Perspective strength relaxes where needed to retain performers and
+avoid empty borders. If corner_pin_keys are present, they contain the combined
+crop and perspective: apply them with native Motion at its identity settings.
+Otherwise keys describe native Motion scale and normalized position.
+
+The JSON includes every required sample boundary and interpolation checks.
+Coverage proves containment of those constraints, not detection of every person
+or coverage of unsampled motion. Review the accompanying frames and the final
+native timeline before treating a generated camera move as finished.
 
 ## Licensing
 

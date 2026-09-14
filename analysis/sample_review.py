@@ -15,10 +15,11 @@ def main():
     parser.add_argument("config", type=Path, help="JSON DecodeConfig, including an optional SSH/Docker prefix")
     parser.add_argument("--models", type=Path, default=Path("models"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--gpu", action="store_true", help="Require CUDA person inference")
     args = parser.parse_args()
     config = DecodeConfig(**json.loads(args.config.read_text()))
     args.output.mkdir(parents=True, exist_ok=True)
-    detector = Performers(args.models)
+    detector = Performers(args.models, gpu=args.gpu)
     records = []
     for t, frame in frames(config):
         detections = detector.detect(frame)
